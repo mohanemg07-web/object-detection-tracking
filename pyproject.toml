@@ -20,8 +20,9 @@ src = ["src", "app", "scripts", "tests"]
 # B: bugbear, C4: comprehensions, SIM: simplify
 select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM"]
 ignore = [
-    "E501",  # line length handled by black
-    "B008",  # function calls in argument defaults (common in CLI/typer)
+    "E501",   # line length handled by black
+    "B008",   # function calls in argument defaults (common in CLI/typer)
+    "SIM300", # allow natural `actual == expected` order in test assertions
 ]
 
 [tool.ruff.lint.isort]
