@@ -1,0 +1,30 @@
+# ============================================================
+# GPU dependencies — TRAINING + TensorRT INT8 only.
+# Install on an NVIDIA GPU + CUDA machine (e.g. Kaggle/Colab T4).
+# NOT needed for the CPU demo, data prep, or ONNX-CPU inference.
+#
+# Install order (recommended):
+#   pip install -r requirements.txt
+#   pip install -r requirements-gpu.txt
+#
+# NOTE: install a CUDA-enabled torch build matching your CUDA
+# version, e.g. for CUDA 12.1:
+#   pip install torch torchvision --index-url \
+#       https://download.pytorch.org/whl/cu121
+# ============================================================
+
+# --- CUDA-enabled deep learning (install via the index-url above) ---
+torch>=2.1
+torchvision>=0.16
+
+# --- ONNX Runtime with CUDA (parity checks / GPU benchmarking) ---
+onnxruntime-gpu>=1.17
+
+# --- TensorRT INT8 engine build + calibration ---
+# TensorRT wheels are platform/CUDA specific. On Colab/Kaggle prefer
+# the NVIDIA pip index. Pin loosely; the build script checks at runtime.
+tensorrt>=8.6
+pycuda>=2024.1       # host<->device buffers for the INT8 calibrator
+
+# --- (Kaggle/Colab convenience) ---
+nvidia-pyindex; platform_system == "Linux"

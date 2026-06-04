@@ -1,0 +1,40 @@
+# ============================================================
+# CPU / base dependencies
+# Use this for: data prep, preprocessing, ONNX(-Runtime) CPU
+# inference, tracking eval, the Gradio demo, and tests.
+# For GPU training + TensorRT, also install requirements-gpu.txt
+# ============================================================
+
+# --- Core CV / numerics ---
+numpy>=1.24,<2.0
+opencv-python-headless>=4.8,<5.0
+Pillow>=10.0
+pyyaml>=6.0
+tqdm>=4.66
+
+# --- Detection / tracking (CPU-capable) ---
+# Ultralytics pulls in a CPU torch by default on non-CUDA wheels.
+ultralytics>=8.1.0,<9.0
+lap>=0.4.0           # required by ByteTrack/BoT-SORT assignment
+
+# --- ONNX (export + CPU runtime + INT8 quantization) ---
+onnx>=1.15
+onnxruntime>=1.17    # CPUExecutionProvider for the deployed demo
+onnxsim>=0.4.33      # optional graph simplification after export
+
+# --- Experiment tracking ---
+mlflow>=2.10
+dagshub>=0.3.0
+
+# --- Tracking metrics ---
+motmetrics>=1.4.0
+pandas>=2.0          # motmetrics + dataset summaries
+
+# --- Demo ---
+gradio>=4.19,<5.0
+
+# --- Tooling / tests ---
+pytest>=8.0
+ruff>=0.3.0
+black>=24.0
+requests>=2.31

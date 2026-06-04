@@ -1,0 +1,16 @@
+# OpenCV preprocessing configuration (src/preprocessing).
+# Each transform is independently toggleable and parameterized.
+
+clahe:
+  enabled: true
+  clip_limit: 2.0          # contrast clipping; higher = stronger local contrast
+  tile_grid_size: [8, 8]   # grid for adaptive histogram equalization
+  color_space: lab         # apply CLAHE on L channel of LAB (preserves color)
+
+perspective:
+  enabled: false           # off by default; needs scene-specific src/dst points
+  # Source quadrilateral (image-pixel coords) -> destination rectangle.
+  # Provide as fractions of width/height for resolution independence.
+  src_points: [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+  dst_points: [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+  output_size: null        # [w, h] or null to keep input size

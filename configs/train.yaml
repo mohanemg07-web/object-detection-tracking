@@ -1,0 +1,43 @@
+# Training configuration for YOLOv8m fine-tuning on VisDrone-DET.
+# Consumed by src/training/train.py. GPU recommended (Kaggle/Colab T4).
+
+model: yolov8m.pt          # base checkpoint to fine-tune from
+data: configs/data.yaml    # YOLO dataset spec (10 classes)
+
+# --- Core hyperparameters ---
+epochs: 100
+imgsz: 640
+batch: 16                  # fits a 16 GB T4 at imgsz 640; lower if OOM
+patience: 25               # early-stopping patience (epochs)
+optimizer: auto
+lr0: 0.01
+lrf: 0.01
+weight_decay: 0.0005
+warmup_epochs: 3.0
+seed: 42
+cos_lr: true
+
+# --- Augmentation (sensible aerial-imagery defaults) ---
+hsv_h: 0.015
+hsv_s: 0.7
+hsv_v: 0.4
+degrees: 0.0
+translate: 0.1
+scale: 0.5
+fliplr: 0.5
+mosaic: 1.0
+close_mosaic: 10           # disable mosaic for the last N epochs
+
+# --- Runtime ---
+device: 0                  # GPU index; overridden to "cpu" if unavailable
+workers: 8
+project: runs/train
+name: yolov8m_visdrone
+exist_ok: false
+
+# --- MLflow / DagsHub ---
+# Set this to your DagsHub MLflow URI before training, e.g.:
+#   https://dagshub.com/<your-username>/<repo-name>.mlflow
+# Leave empty to log to a local ./mlruns directory instead.
+mlflow_tracking_uri: ""
+mlflow_experiment: visdrone-yolov8m

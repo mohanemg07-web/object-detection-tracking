@@ -1,0 +1,9 @@
+# ByteTrack tracker config (Ultralytics-compatible).
+# Pass via model.track(..., tracker="configs/bytetrack.yaml").
+tracker_type: bytetrack    # tracker class
+track_high_thresh: 0.5     # first-association detection conf threshold
+track_low_thresh: 0.1      # second-association (recover low-conf) threshold
+new_track_thresh: 0.6      # min conf to spawn a brand-new track
+track_buffer: 30           # frames to keep a lost track before deletion
+match_thresh: 0.8          # IoU matching threshold for association
+fuse_score: true           # fuse detection confidence into matching cost

@@ -1,0 +1,15 @@
+# Central path configuration. All paths are relative to repo root
+# unless absolute. Override per-machine by copying to paths.local.yaml
+# (gitignored) and pointing scripts at it.
+
+data_root: data
+raw_dir: data/raw                 # downloaded VisDrone zips/extracted
+yolo_dir: data/yolo               # converted YOLO-format dataset
+det_dataset: VisDrone-DET         # detection subset name
+mot_dataset: VisDrone-MOT         # tracking subset name
+
+weights_dir: weights              # *.pt / *.onnx / *.engine (gitignored)
+runs_dir: runs                    # ultralytics run outputs (gitignored)
+outputs_dir: outputs              # inference videos, viz, reports
+
+data_yaml: configs/data.yaml      # generated/maintained YOLO data spec

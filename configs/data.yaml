@@ -1,0 +1,26 @@
+# Ultralytics YOLO dataset spec for VisDrone-DET (10 classes).
+# `path` is the dataset root; train/val/test are relative to it.
+# This file is generated/validated by src/data/convert_visdrone.py
+# but is committed so the class mapping is the single source of truth.
+
+path: ../data/yolo/VisDrone-DET
+train: images/train
+val: images/val
+test: images/test
+
+# VisDrone 10 detection classes (YOLO ids 0-9).
+# Source category ids 0 (ignored regions) and 11 (others) are dropped
+# during conversion; the remaining source ids 1-10 map to 0-9 here.
+names:
+  0: pedestrian
+  1: people
+  2: bicycle
+  3: car
+  4: van
+  5: truck
+  6: tricycle
+  7: awning-tricycle
+  8: bus
+  9: motor
+
+nc: 10
