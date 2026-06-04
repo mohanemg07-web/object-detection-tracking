@@ -1,0 +1,23 @@
+# Normalize line endings. Text files use LF in the repo; Git converts
+# to native on checkout where appropriate.
+* text=auto eol=lf
+
+# Shell scripts must stay LF even on Windows checkouts.
+*.sh text eol=lf
+
+# Windows scripts stay CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Treat notebooks and configs as text for clean diffs.
+*.ipynb text
+*.yaml text
+*.yml text
+
+# Binary artifacts (should be gitignored, but be explicit).
+*.pt binary
+*.onnx binary
+*.engine binary
+*.png binary
+*.jpg binary
+*.mp4 binary
