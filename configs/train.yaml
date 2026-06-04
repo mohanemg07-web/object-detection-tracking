@@ -1,5 +1,5 @@
 # Training configuration for YOLOv8m fine-tuning on VisDrone-DET.
-# Consumed by src/training/train.py. GPU recommended (Kaggle/Colab T4).
+# Consumed by src/training/train.py. GPU recommended (Colab T4).
 
 model: yolov8m.pt          # base checkpoint to fine-tune from
 data: configs/data.yaml    # YOLO dataset spec (10 classes)

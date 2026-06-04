@@ -16,7 +16,7 @@ the [VisDrone](http://aiskyeye.com/) aerial dataset, with full MLOps and a
 A portfolio-grade pipeline that prioritizes **clean code, reproducibility,
 honest metrics, and free-tier deployability**. Every GPU-only step (training,
 TensorRT) is isolated into standalone scripts + notebooks so it runs on a
-free Kaggle/Colab T4; the deployed demo runs entirely on CPU via ONNX Runtime.
+free Colab T4; the deployed demo runs entirely on CPU via ONNX Runtime.
 
 ## Architecture
 
@@ -88,7 +88,7 @@ object-detection-tracking/
 │   ├── tracking/    # ByteTrack + MOTA/MOTP eval
 │   └── inference/   # unified preprocess→detect→track (video/webcam)
 ├── app/             # Gradio app for HF Spaces (CPU, ONNX-INT8)
-├── notebooks/       # Kaggle training + TensorRT notebooks (T4)
+├── notebooks/       # Colab training + TensorRT notebooks (T4)
 ├── tests/           # unit tests
 ├── scripts/         # CLI convenience wrappers
 └── .github/workflows/  # CI: lint + tests
@@ -116,7 +116,7 @@ GPU steps (training, TensorRT) — see [`notebooks/`](notebooks/).
 
 - **GPU required** for training and TensorRT INT8; both detect CUDA at
   runtime and fail with a clear message if unavailable. Use the provided
-  Kaggle/Colab notebooks (free T4).
+  Colab notebook (free T4).
 - The **deployed demo is CPU-only** (ONNX Runtime, `CPUExecutionProvider`)
   and therefore slower (~3–4 FPS target) than GPU tracking (~30 FPS).
 - Reported metrics are **targets**; measured values are populated from

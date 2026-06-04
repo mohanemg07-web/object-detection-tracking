@@ -52,7 +52,7 @@ def detect_device(requested: str | int, allow_cpu: bool) -> str:
     if not allow_cpu:
         raise SystemExit(
             "No CUDA GPU detected. YOLOv8m fine-tuning needs an NVIDIA GPU.\n"
-            "  * Run this on a free Kaggle/Colab T4 (see notebooks/train_kaggle.ipynb), or\n"
+            "  * Run this on a free Colab T4 (see notebooks/train_colab.ipynb), or\n"
             "  * pass --allow-cpu --epochs 1 for a tiny CPU smoke test."
         )
     print("[device] CUDA not available; running on CPU (smoke test only).")
