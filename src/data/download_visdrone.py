@@ -27,25 +27,35 @@ import yaml
 from src.data.config import load_paths
 
 # --- Default archive registry ------------------------------------------------
-# These are the official VisDrone2019 archive names. The `url` field is the
-# best-effort public link; mirrors rotate, so if a download 404s, pass your
-# own --urls file mapping the same archive names to fresh links or local
-# paths. `gdrive_id` (if set) is used via gdown when `url` is empty.
-DEFAULT_ARCHIVES: dict[str, dict[str, str]] = {
+# Archive sources. `url` (primary) is an HTTP path tried first; `gdrive_id`
+# (fallback) is used via gdown only if `url` is empty or fails. Mirrors can
+# rotate, so a custom --urls YAML can override any entry.
+#
+# DET-train/DET-val use the Ultralytics GitHub-release mirror (reliable, no
+# Google-Drive quota). MOT-val has no Ultralytics mirror and is `optional`:
+# it is only needed for the post-training MOTA eval, NOT for DET training, so
+# its failure must not break the data-prep step.
+DEFAULT_ARCHIVES: dict[str, dict] = {
     "VisDrone2019-DET-train": {
-        "url": "",
+        "url": "https://github.com/ultralytics/assets/releases/download/v0.0.0/VisDrone2019-DET-train.zip",
         "gdrive_id": "1a2oHjcEcwXP8oUF95qiwrqzACb2YlUhn",
         "split": "det-train",
+        "optional": False,
     },
     "VisDrone2019-DET-val": {
-        "url": "",
+        "url": "https://github.com/ultralytics/assets/releases/download/v0.0.0/VisDrone2019-DET-val.zip",
         "gdrive_id": "1bxK5zgLn0_L8x276eKkuYA_FzwCIjb59",
         "split": "det-val",
+        "optional": False,
     },
+    # No Ultralytics mirror hosts MOT-val. Only the Google-Drive fallback is
+    # available (and may be quota-blocked). Optional: required solely for the
+    # MOTA eval, so a failure here does not fail the DET training data prep.
     "VisDrone2019-MOT-val": {
         "url": "",
         "gdrive_id": "1-qX2d-P1Xj4M2v3pCfV1V3Z8b2j3VYy0",
         "split": "mot-val",
+        "optional": True,
     },
 }
 
@@ -187,13 +197,34 @@ def main(argv: list[str] | None = None) -> int:
         registry = {args.only: registry[args.only]}
 
     print(f"Target raw dir: {paths.raw_dir}")
-    ok = True
+    required_ok = True
+    optional_failed: list[str] = []
     for name, spec in registry.items():
-        ok = download_archive(name, spec, paths.raw_dir) and ok
+        ok = download_archive(name, spec, paths.raw_dir)
+        if ok:
+            continue
+        if spec.get("optional", False):
+            optional_failed.append(name)
+            print(
+                f"[skip] {name} is optional (only needed for MOTA eval, not "
+                f"DET training); continuing without it."
+            )
+        else:
+            required_ok = False
 
-    if not ok:
+    if optional_failed:
         print(
-            "\nSome archives could not be downloaded automatically (mirrors "
+            "\nNote: optional archive(s) not downloaded: "
+            f"{', '.join(optional_failed)}.\n"
+            "  These are only needed for the post-training MOTA evaluation. "
+            "DET training is unaffected. To fetch MOT-val later, obtain it "
+            "from http://aiskyeye.com/download/ and place/extract it in the "
+            "raw dir, or pass a working link via --urls urls.yaml."
+        )
+
+    if not required_ok:
+        print(
+            "\nA REQUIRED archive could not be downloaded automatically (mirrors "
             "rotate frequently). Options:\n"
             "  1. Get fresh links from http://aiskyeye.com/download/ and pass "
             "them via --urls urls.yaml\n"
@@ -202,7 +233,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    print("\nAll archives present and extracted.")
+    print("\nAll required archives present and extracted.")
     return 0
 
 
