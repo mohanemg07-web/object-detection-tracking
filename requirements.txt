@@ -6,7 +6,7 @@
 # ============================================================
 
 # --- Core CV / numerics ---
-numpy>=1.24,<2.0
+numpy>=1.24
 opencv-python-headless>=4.8,<5.0
 Pillow>=10.0
 pyyaml>=6.0
