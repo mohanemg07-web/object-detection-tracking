@@ -51,7 +51,8 @@ data/
 *.engine
 *.trt
 *.plan
-weights/
+weights/*
+!weights/README.md
 runs/
 outputs/
 artifacts/

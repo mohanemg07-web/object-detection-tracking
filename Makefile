@@ -42,7 +42,7 @@ data-download:
 	python -m src.data.download_visdrone --config configs/paths.yaml
 
 data-convert:
-	python -m src.data.convert_visdrone --config configs/paths.yaml
+	python -m src.data.convert_visdrone --config configs/paths.yaml --write-data-yaml
 
 data-validate:
 	python -m src.data.validate_labels --config configs/paths.yaml
