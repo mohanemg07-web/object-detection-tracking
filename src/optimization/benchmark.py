@@ -80,31 +80,33 @@ def bench_pytorch(path: Path, imgsz: int, runs: int, warmup: int) -> BenchResult
     return BenchResult("PyTorch FP32", _file_mb(path), lat, fps)
 
 
-def run_benchmarks(weights_dir: Path, imgsz: int, runs: int, warmup: int) -> list[BenchResult]:
+def run_benchmarks(
+    weights_dir: Path, imgsz: int, runs: int, warmup: int, stem: str = "best"
+) -> list[BenchResult]:
     results: list[BenchResult] = []
 
-    pt = weights_dir / "best.pt"
+    pt = weights_dir / f"{stem}.pt"
     if pt.exists():
         try:
             results.append(bench_pytorch(pt, imgsz, runs, warmup))
         except Exception as exc:  # noqa: BLE001
             results.append(BenchResult("PyTorch FP32", _file_mb(pt), None, None, f"skipped: {exc}"))
     else:
-        results.append(BenchResult("PyTorch FP32", None, None, None, "best.pt not found"))
+        results.append(BenchResult("PyTorch FP32", None, None, None, f"{pt.name} not found"))
 
-    onnx_fp32 = weights_dir / "best.onnx"
+    onnx_fp32 = weights_dir / f"{stem}.onnx"
     if onnx_fp32.exists():
         results.append(bench_onnx(onnx_fp32, imgsz, runs, warmup, "ONNX FP32"))
     else:
-        results.append(BenchResult("ONNX FP32", None, None, None, "best.onnx not found"))
+        results.append(BenchResult("ONNX FP32", None, None, None, f"{onnx_fp32.name} not found"))
 
-    onnx_int8 = weights_dir / "best.int8.onnx"
+    onnx_int8 = weights_dir / f"{stem}.int8.onnx"
     if onnx_int8.exists():
         results.append(bench_onnx(onnx_int8, imgsz, runs, warmup, "ONNX INT8"))
     else:
-        results.append(BenchResult("ONNX INT8", None, None, None, "best.int8.onnx not found"))
+        results.append(BenchResult("ONNX INT8", None, None, None, f"{onnx_int8.name} not found"))
 
-    engine = weights_dir / "best.int8.engine"
+    engine = weights_dir / f"{stem}.int8.engine"
     note = "GPU only — run on a CUDA machine" if not engine.exists() else "present (bench on GPU)"
     results.append(BenchResult("TensorRT INT8", _file_mb(engine), None, None, note))
 
@@ -127,6 +129,7 @@ def format_markdown(results: list[BenchResult]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Benchmark detector variants (CPU).")
     parser.add_argument("--weights-dir", default="weights")
+    parser.add_argument("--stem", default="best", help="model filename stem (e.g. 'best')")
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--runs", type=int, default=50)
     parser.add_argument("--warmup", type=int, default=5)
@@ -134,13 +137,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     weights_dir = Path(args.weights_dir)
-    results = run_benchmarks(weights_dir, args.imgsz, args.runs, args.warmup)
+    results = run_benchmarks(weights_dir, args.imgsz, args.runs, args.warmup, stem=args.stem)
     table = format_markdown(results)
     print("\n" + table + "\n")
 
     if args.out:
-        Path(args.out).write_text(table + "\n", encoding="utf-8")
-        print(f"[bench] wrote table to {args.out}")
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(table + "\n", encoding="utf-8")
+        print(f"[bench] wrote table to {out}")
     return 0
 
 

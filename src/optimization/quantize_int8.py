@@ -102,7 +102,6 @@ def quantize(
     """Statically quantize an ONNX model to INT8 and return the output path."""
     import onnx
     from onnxruntime.quantization import QuantFormat, QuantType, quantize_static
-    from onnxruntime.quantization.preprocess import quant_pre_process
 
     model_path = Path(model_path)
     if not model_path.exists():
@@ -110,9 +109,15 @@ def quantize(
     calib_dir = Path(calib_dir)
     out_path = Path(out_path) if out_path else model_path.with_suffix(".int8.onnx")
 
+    # Static quantization calibrates at a fixed input size, so pin the
+    # (often dynamic) input dims to (1, 3, imgsz, imgsz) first. Dynamic axes
+    # are what break symbolic shape inference during pre-processing.
+    static = model_path.with_suffix(".static.onnx")
+    _fix_input_shape(onnx.load(str(model_path)), imgsz, static)
+
     # Pre-process (shape inference + folding) improves static-quant quality.
-    prepped = model_path.with_suffix(".prep.onnx")
-    quant_pre_process(str(model_path), str(prepped))
+    # Robust against models that still trip symbolic shape inference.
+    prepped = _safe_pre_process(static, model_path.with_suffix(".prep.onnx"))
 
     model = onnx.load(str(prepped))
     input_name = model.graph.input[0].name
@@ -127,7 +132,9 @@ def quantize(
         weight_type=QuantType.QInt8,
         activation_type=QuantType.QInt8,
     )
-    prepped.unlink(missing_ok=True)
+    static.unlink(missing_ok=True)
+    if prepped != static:
+        prepped.unlink(missing_ok=True)
 
     fp32_mb = model_path.stat().st_size / 1e6
     int8_mb = out_path.stat().st_size / 1e6
@@ -137,6 +144,57 @@ def quantize(
         f"({reduction:.1f}% smaller)"
     )
     return out_path
+
+
+def _fix_input_shape(model, imgsz: int, out_path: Path) -> None:
+    """Pin the model's primary input to a static (1, 3, imgsz, imgsz) shape.
+
+    Also ensures opset >= 13: per-channel INT8 QDQ uses the ``axis``
+    attribute on (De)QuantizeLinear, which only exists from opset 13.
+    """
+    import onnx
+    from onnx import version_converter
+
+    inp = model.graph.input[0]
+    dims = inp.type.tensor_type.shape.dim
+    target = [1, 3, imgsz, imgsz]
+    for d, value in zip(dims, target, strict=False):
+        d.ClearField("dim_param")
+        d.dim_value = value
+
+    current = max(
+        (op.version for op in model.opset_import if op.domain in ("", "ai.onnx")), default=0
+    )
+    if current and current < 13:
+        try:
+            model = version_converter.convert_version(model, 13)
+            print(f"[quant] upgraded ONNX opset {current} -> 13 for per-channel QDQ")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[quant] opset upgrade failed ({exc}); proceeding at opset {current}")
+
+    onnx.save(model, str(out_path))
+
+
+def _safe_pre_process(in_path: Path, out_path: Path) -> Path:
+    """Run quant pre-processing, degrading gracefully on shape-infer failures.
+
+    Tries (1) full pre-process, (2) pre-process with symbolic shape
+    inference skipped, then (3) returns the input model unchanged so
+    quantization can still proceed.
+    """
+    from onnxruntime.quantization.preprocess import quant_pre_process
+
+    try:
+        quant_pre_process(str(in_path), str(out_path))
+        return out_path
+    except Exception as exc:  # noqa: BLE001
+        print(f"[quant] pre-process retry (symbolic shape skipped): {exc}")
+    try:
+        quant_pre_process(str(in_path), str(out_path), skip_symbolic_shape=True)
+        return out_path
+    except Exception as exc:  # noqa: BLE001
+        print(f"[quant] pre-process skipped, quantizing raw model: {exc}")
+        return in_path
 
 
 def main(argv: list[str] | None = None) -> int:

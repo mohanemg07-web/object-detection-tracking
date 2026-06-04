@@ -36,8 +36,10 @@ name: yolov8m_visdrone
 exist_ok: false
 
 # --- MLflow / DagsHub ---
-# Set this to your DagsHub MLflow URI before training, e.g.:
-#   https://dagshub.com/<your-username>/<repo-name>.mlflow
+# DagsHub MLflow tracking URI for this project.
+# Auth at runtime via env vars (never commit the token):
+#   MLFLOW_TRACKING_USERNAME = mohanemg07-web
+#   MLFLOW_TRACKING_PASSWORD = <DagsHub access token>  (from Colab secret DAGSHUB_TOKEN)
 # Leave empty to log to a local ./mlruns directory instead.
-mlflow_tracking_uri: ""
+mlflow_tracking_uri: "https://dagshub.com/mohanemg07-web/object-detection-tracking.mlflow"
 mlflow_experiment: visdrone-yolov8m

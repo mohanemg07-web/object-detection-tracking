@@ -204,6 +204,48 @@ MODEL_PATH=weights/best.int8.onnx python app/app.py
 Deploy to HuggingFace Spaces — see [`app/README.md`](app/README.md) for the
 Spaces header and two deployment options.
 
+### Post-training checklist (run once `weights/best.pt` exists)
+
+After the Colab run produces `best.pt`, place it at `weights/best.pt` and
+run these CPU steps in order. Each is copy-pasteable; fill the printed
+numbers into the README results tables.
+
+```bash
+# 1. Export to ONNX (opset 13, dynamic axes) + PyTorch<->ORT parity check
+python -m src.optimization.export_onnx --weights weights/best.pt --imgsz 640
+#    -> writes weights/best.onnx ; expect "[parity] ... -> PASS"
+
+# 2. Static INT8 quantization (calibrate on real VisDrone val images)
+python -m src.optimization.quantize_int8 \
+    --model weights/best.onnx \
+    --calib-dir data/yolo/VisDrone-DET/images/val \
+    --num-samples 200 --imgsz 640
+#    -> writes weights/best.int8.onnx ; prints the size reduction %
+
+# 3. (GPU, optional) TensorRT INT8 engine — run in notebooks/tensorrt_int8.ipynb
+#    python -m src.optimization.build_tensorrt --onnx weights/best.onnx \
+#        --calib-dir data/yolo/VisDrone-DET/images/val --engine weights/best.int8.engine
+
+# 4. Benchmark size / latency / FPS across the variants present
+python -m src.optimization.benchmark --weights-dir weights --stem best \
+    --runs 100 --out outputs/bench.md
+#    -> prints + writes the Optimization table (run on GPU for the TensorRT row)
+
+# 5. MOTA / MOTP on a VisDrone-MOT sequence
+python -m src.tracking.evaluate_mota \
+    --model weights/best.int8.onnx \
+    --seq-images data/raw/VisDrone2019-MOT-val/sequences/<seq> \
+    --gt data/raw/VisDrone2019-MOT-val/annotations/<seq>.txt
+#    -> prints MOTA / MOTP / IDF1
+
+# 6. Transcribe measured numbers into the README tables:
+#    - Detection: mAP@0.5 / mAP@0.5:0.95 from the Colab training run (MLflow/DagsHub)
+#    - Optimization: paste outputs/bench.md (size, latency, FPS); add mAP delta
+#    - Tracking: MOTA / MOTP / FPS from step 5 (FPS from --runs on GPU)
+#    - Demo: FPS reported by the Gradio app on Spaces
+#    Replace every "_TODO_" with the real value; do not fabricate.
+```
+
 ### Lint + test (CPU)
 
 ```bash

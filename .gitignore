@@ -64,6 +64,9 @@ calibration/
 tmp/
 *.log
 
+# ---- ONNX external-data artifacts (UUID .data dumps) ----
+*.data
+
 # ---- Secrets ----
 .env
 *.secret
