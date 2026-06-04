@@ -41,9 +41,12 @@ htmlcov/
 Thumbs.db
 
 # ---- Project: datasets (several GB, never commit) ----
-data/
-!data/.gitkeep
-!data/README.md
+# Anchored to repo root so it does NOT match the src/data/ source package.
+# Use /data/* (not /data/) so the README/.gitkeep negations can re-include
+# files (git cannot re-include a file under a fully-excluded directory).
+/data/*
+!/data/.gitkeep
+!/data/README.md
 
 # ---- Project: model weights & artifacts ----
 *.pt
@@ -51,12 +54,12 @@ data/
 *.engine
 *.trt
 *.plan
-weights/*
-!weights/README.md
-runs/
-outputs/
-artifacts/
-mlruns/
+/weights/*
+!/weights/README.md
+/runs/
+/outputs/
+/artifacts/
+/mlruns/
 *.cache
 
 # ---- Project: calibration / temp ----
