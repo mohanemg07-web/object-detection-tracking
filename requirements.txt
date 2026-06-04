@@ -11,6 +11,7 @@ opencv-python-headless>=4.8,<5.0
 Pillow>=10.0
 pyyaml>=6.0
 tqdm>=4.66
+gdown>=5.1.0         # Google Drive download path for VisDrone archives
 
 # --- Detection / tracking (CPU-capable) ---
 # Ultralytics pulls in a CPU torch by default on non-CUDA wheels.
