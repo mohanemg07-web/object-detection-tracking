@@ -1,0 +1,8 @@
+# CPU-only dependencies for the HuggingFace Spaces demo.
+# Deliberately minimal: NO torch, NO ultralytics, NO tensorrt.
+# Inference runs on the ONNX INT8 model via ONNX Runtime (CPU).
+gradio>=4.19,<5.0
+onnxruntime>=1.17
+opencv-python-headless>=4.8,<5.0
+numpy>=1.24,<2.0
+pyyaml>=6.0
