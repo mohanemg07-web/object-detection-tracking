@@ -154,6 +154,18 @@ def build_engine(
 
     if not _platform_has_fast(builder, "int8"):
         print("[trt] warning: platform reports no fast INT8; continuing anyway")
+
+    # Safety net: TRT 11 removed the classic implicit-calibration INT8 API
+    # (BuilderFlag.INT8 + IInt8EntropyCalibrator2). This code targets TRT 10.x;
+    # fail with an actionable message instead of an opaque AttributeError.
+    if not hasattr(trt.BuilderFlag, "INT8"):
+        raise SystemExit(
+            f"Installed TensorRT {getattr(trt, '__version__', '?')} is too new: "
+            "BuilderFlag.INT8 (classic INT8 calibration) was removed in TRT 11. "
+            "Pin TensorRT 10.x, e.g.  pip install 'tensorrt==10.7.0'  "
+            "(see notebooks/tensorrt_int8.ipynb)."
+        )
+
     config.set_flag(trt.BuilderFlag.INT8)
     config.int8_calibrator = _make_calibrator(trt, cuda, Path(calib_dir), num_samples, imgsz, cache)
 
