@@ -112,6 +112,18 @@ def _set_workspace(config, trt, workspace_gb: int) -> None:
         config.max_workspace_size = size
 
 
+def _platform_has_fast(builder, precision: str) -> bool:
+    """Version-safe check for fast INT8/FP16 support.
+
+    TRT 10+ removed ``builder.platform_has_fast_int8`` /
+    ``platform_has_fast_fp16`` (the builder selects kernels itself), so
+    default to True there and let the build proceed. On older TRT the real
+    attribute is consulted so the informative warning still fires.
+    """
+    attr = f"platform_has_fast_{precision}"
+    return bool(getattr(builder, attr, True))
+
+
 def build_engine(
     onnx_path: str | Path,
     calib_dir: str | Path,
@@ -140,8 +152,8 @@ def build_engine(
     config = builder.create_builder_config()
     _set_workspace(config, trt, workspace_gb)
 
-    if not builder.platform_has_fast_int8:
-        print("[trt] WARNING: platform reports no fast INT8; engine may fall back.")
+    if not _platform_has_fast(builder, "int8"):
+        print("[trt] warning: platform reports no fast INT8; continuing anyway")
     config.set_flag(trt.BuilderFlag.INT8)
     config.int8_calibrator = _make_calibrator(trt, cuda, Path(calib_dir), num_samples, imgsz, cache)
 
