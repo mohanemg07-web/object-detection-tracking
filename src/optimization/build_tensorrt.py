@@ -87,6 +87,31 @@ def _make_calibrator(trt, cuda, calib_dir: Path, num_samples: int, imgsz: int, c
     return _EntropyCalibrator()
 
 
+def _network_flags(trt) -> int:
+    """Network-creation flags compatible with both TRT <10 and TRT 10+.
+
+    Pre-10 required ``EXPLICIT_BATCH``; TRT 10+ removed that enum because
+    explicit batch is always the default, so ``create_network(0)`` is correct.
+    """
+    flag_enum = getattr(trt, "NetworkDefinitionCreationFlag", None)
+    if flag_enum is not None and hasattr(flag_enum, "EXPLICIT_BATCH"):
+        return 1 << int(flag_enum.EXPLICIT_BATCH)
+    return 0
+
+
+def _set_workspace(config, trt, workspace_gb: int) -> None:
+    """Set the builder workspace limit across TRT API versions.
+
+    TRT 8.4+ uses ``config.set_memory_pool_limit(MemoryPoolType.WORKSPACE, n)``;
+    older builds used the now-removed ``config.max_workspace_size = n``.
+    """
+    size = workspace_gb << 30
+    if hasattr(config, "set_memory_pool_limit") and hasattr(trt, "MemoryPoolType"):
+        config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, size)
+    else:  # legacy fallback (TRT < 8.4)
+        config.max_workspace_size = size
+
+
 def build_engine(
     onnx_path: str | Path,
     calib_dir: str | Path,
@@ -106,14 +131,14 @@ def build_engine(
 
     logger = trt.Logger(trt.Logger.WARNING)
     builder = trt.Builder(logger)
-    network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+    network = builder.create_network(_network_flags(trt))
     parser = trt.OnnxParser(network, logger)
     if not parser.parse(onnx_path.read_bytes()):
         errs = "\n".join(str(parser.get_error(i)) for i in range(parser.num_errors))
         raise RuntimeError(f"failed to parse ONNX:\n{errs}")
 
     config = builder.create_builder_config()
-    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace_gb << 30)
+    _set_workspace(config, trt, workspace_gb)
 
     if not builder.platform_has_fast_int8:
         print("[trt] WARNING: platform reports no fast INT8; engine may fall back.")
@@ -126,7 +151,9 @@ def build_engine(
         raise RuntimeError("engine build failed (returned None)")
 
     engine_path.parent.mkdir(parents=True, exist_ok=True)
-    engine_path.write_bytes(serialized)
+    # build_serialized_network returns an IHostMemory buffer; bytes() works
+    # across versions (memoryview-compatible) and yields a writable payload.
+    engine_path.write_bytes(bytes(serialized))
     print(f"[trt] engine written: {engine_path} ({engine_path.stat().st_size / 1e6:.1f} MB)")
     return engine_path
 
