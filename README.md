@@ -64,41 +64,73 @@ deployed demo — runs on **CPU**.
 
 ## Results
 
-> **Targets vs. measured.** Targets reflect the project goals; the
-> "Measured" column is filled in **only** from real runs. `TODO` = run the
-> corresponding GPU step and paste the value (see notebooks/).
+> **Measured results** from the completed runs below. Detection + training
+> were on a Colab **A100-80GB**; optimization latency was measured on a Colab
+> **T4** (TensorRT row) and **CPU** (PyTorch/ONNX rows) — see the per-table
+> notes. Numbers are reported as-is from the runs, not idealized targets.
 
-### Detection (VisDrone-DET val)
+### Detection (YOLOv8m, VisDrone-DET val · 50 epochs, A100)
 
-| Metric          | Target | Measured |
-|-----------------|:------:|:--------:|
-| mAP@0.5         | ~0.87  | _TODO_   |
-| mAP@0.5:0.95    |   —    | _TODO_   |
-| Training time   | ~3 h (T4) | _TODO_ |
+| Metric        | Measured |
+|---------------|:--------:|
+| mAP@0.5       | **0.435** |
+| mAP@0.5:0.95  | 0.268    |
+| Precision     | 0.552    |
+| Recall        | 0.433    |
+| Training time | ~47 min (50 epochs, Colab A100-80GB) |
 
-### Optimization (latency / size)
+Per-class mAP@0.5 (highlights):
 
-| Model         | Size (MB) | Latency (ms) | FPS | mAP@0.5 | Δ mAP |
-|---------------|:---------:|:------------:|:---:|:-------:|:-----:|
-| PyTorch FP32  |  _TODO_   |   _TODO_     |_TODO_| _TODO_ |  —    |
-| ONNX INT8     |  _TODO_   |   _TODO_     |_TODO_| _TODO_ | _TODO_|
-| TensorRT INT8 |  _TODO_   |   _TODO_     |_TODO_| _TODO_ | _TODO_|
+| Class | mAP@0.5 | | Class | mAP@0.5 |
+|-------|:-------:|-|-------|:-------:|
+| car   | 0.830 | | motor          | 0.471 |
+| bus   | 0.679 | | truck          | 0.410 |
+| van   | 0.522 | | tricycle       | 0.341 |
+| pedestrian | 0.458 | | people     | 0.337 |
+|       |       | | bicycle        | 0.167 |
+|       |       | | awning-tricycle| 0.140 |
 
-Targets: ~68% size reduction, <1.5% mAP loss from INT8, ~30 FPS GPU tracking.
+VisDrone is a **hard small-object aerial benchmark** (tiny, densely packed,
+heavily occluded objects from drone altitude), so an overall mAP@0.5 of
+**0.435** is a reasonable result for a 50-epoch YOLOv8m fine-tune. The
+profile reflects object size/frequency: large, common classes like **car
+(0.83), bus (0.68), van (0.52)** score well, while small or rare classes
+like **bicycle (0.17)** and **awning-tricycle (0.14)** are much harder and
+drag the mean down.
+
+### Optimization (size / latency / FPS)
+
+| Model         | Size (MB) | Latency (ms) | FPS   | Measured on |
+|---------------|:---------:|:------------:|:-----:|-------------|
+| PyTorch FP32  |  52.0     |   317.6      |   3.1 | CPU |
+| ONNX FP32     | 103.6     |   262.0      |   3.8 | CPU |
+| ONNX INT8     |  26.5     |   434.7      |   2.3 | CPU |
+| TensorRT INT8 |  30.4     |     4.2      | 240.7 | **T4 GPU** |
+
+**Honest framing:** the PyTorch/ONNX rows are **CPU-measured**; the TensorRT
+row is **T4 GPU-measured** — different hardware, so don't read the table as a
+single apples-to-apples latency ladder. Two takeaways that *are* fair:
+
+- **INT8 quantization shrinks the model 74.4%** (ONNX FP32 103.6 MB →
+  ONNX INT8 26.5 MB). On this CPU (no VNNI/AVX-512 INT8 acceleration) INT8
+  latency does **not** improve — ONNX INT8 is actually slower than FP32 — so
+  the CPU INT8 win here is purely **size**, not speed.
+- **TensorRT INT8 on the T4 is the real speed story: 240.7 FPS / 4.2 ms** —
+  that's the GPU deployment path, where INT8 delivers both small size *and*
+  large speedup.
 
 ### Tracking (VisDrone-MOT)
 
-| Metric | Target | Measured |
-|--------|:------:|:--------:|
-| MOTA   | ~0.74  | _TODO_   |
-| MOTP   |   —    | _TODO_   |
-| FPS (GPU) | ~30 | _TODO_   |
+ByteTrack runs on top of the detector; the unified pipeline + MOTA/MOTP
+evaluation script (`src/tracking/evaluate_mota.py`) are in place. MOT-val
+sequence metrics are not yet transcribed here — run the eval on a
+VisDrone-MOT sequence to populate this section.
 
 ### Demo (HuggingFace Spaces, CPU 2 vCPU / 16 GB)
 
-| Metric    | Target  | Measured |
-|-----------|:-------:|:--------:|
-| FPS (CPU) | ~3–4    | _TODO_   |
+The Gradio app runs the ONNX INT8 model on CPU via ONNX Runtime. Expected
+throughput on the free tier is a few FPS (consistent with the CPU ONNX
+latency above); the app prints the live FPS it actually achieves.
 
 ---
 
@@ -259,12 +291,14 @@ ruff check . && black --check . && pytest -q
   (training allows `--allow-cpu --epochs 1` for a smoke test only). Use the
   free Colab T4 notebooks for the real runs.
 - The **deployed demo is CPU-only** (ONNX Runtime, `CPUExecutionProvider`,
-  no torch/TensorRT). Expect ~3–4 FPS — far below GPU tracking (~30 FPS) —
+  no torch/TensorRT). It runs at a few FPS on the free tier — far below the
+  measured **TensorRT INT8 GPU throughput (240.7 FPS / 4.2 ms on a T4)** —
   and long videos are capped (default 300 frames) to fit the free tier.
-- **Reported metrics are targets** until filled from real runs. The README
-  results tables hold `TODO`s precisely so numbers are never fabricated;
-  paste measured values after training/benchmarking. Results vary with
-  hardware, epoch count, seed, and confidence thresholds.
+- **Metrics are real, measured values, not idealized targets.** Detection
+  mAP@0.5 is **0.435** (50-epoch YOLOv8m on VisDrone, A100); results vary
+  with hardware, epoch count, seed, and confidence thresholds. VisDrone is a
+  hard small-object aerial dataset, which is why strong classes (car/bus/van)
+  far outscore hard ones (bicycle/awning-tricycle).
 - **VisDrone download mirrors rotate.** The downloader supports resumable
   HTTP and Google Drive (`gdown`), but you may need to supply fresh links.
 - The bundled **ByteTrack is a compact reimplementation** (pure NumPy + a
@@ -272,8 +306,9 @@ ruff check . && black --check . && pytest -q
   dependency-light. The `.pt` GPU path can instead use Ultralytics' built-in
   tracker via `configs/bytetrack.yaml` / `configs/botsort.yaml`
   (`src/tracking/ultralytics_tracker.py`).
-- **TensorRT numbers are GPU-only** and cannot be measured on this CPU
-  workstation; the benchmark marks that row accordingly until run on CUDA.
+- **TensorRT INT8 is GPU-only** and was measured on a Colab T4 (240.7 FPS);
+  it cannot be measured on a CPU-only workstation — the benchmark marks that
+  row by where it ran.
 - Accessibility/UX of the Gradio demo is minimal; it is a technical
   showcase, not a production UI.
 
