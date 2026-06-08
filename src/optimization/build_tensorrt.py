@@ -124,6 +124,40 @@ def _platform_has_fast(builder, precision: str) -> bool:
     return bool(getattr(builder, attr, True))
 
 
+def _maybe_add_static_profile(builder, network, config, imgsz: int) -> None:
+    """If the parsed network has any dynamic input dim, pin it via a profile.
+
+    TensorRT INT8 (implicit calibration) needs a static input shape. When the
+    ONNX was exported with dynamic axes, we add an optimization profile that
+    sets min == opt == max = (1, 3, imgsz, imgsz) for each input, so the engine
+    still builds. Static ONNX (no -1 dims) needs no profile. Version-safe for
+    TRT 10.x (create_optimization_profile / add_optimization_profile).
+    """
+    inputs = [network.get_input(i) for i in range(network.num_inputs)]
+    has_dynamic = any(any(d == -1 for d in inp.shape) for inp in inputs)
+    if not has_dynamic:
+        return
+
+    profile = builder.create_optimization_profile()
+    for inp in inputs:
+        shape = list(inp.shape)
+        # Replace each dynamic dim (-1): batch->1, spatial->imgsz, channels->3.
+        fixed = []
+        for axis, dim in enumerate(shape):
+            if dim != -1:
+                fixed.append(dim)
+            elif axis == 0:
+                fixed.append(1)  # batch
+            elif axis == 1:
+                fixed.append(3)  # channels
+            else:
+                fixed.append(imgsz)  # H, W
+        fixed_t = tuple(fixed)
+        profile.set_shape(inp.name, fixed_t, fixed_t, fixed_t)  # min == opt == max
+        print(f"[trt] dynamic input '{inp.name}' pinned to {fixed_t} via optimization profile")
+    config.add_optimization_profile(profile)
+
+
 def build_engine(
     onnx_path: str | Path,
     calib_dir: str | Path,
@@ -151,6 +185,8 @@ def build_engine(
 
     config = builder.create_builder_config()
     _set_workspace(config, trt, workspace_gb)
+    # A dynamic-input ONNX needs a static optimization profile for INT8.
+    _maybe_add_static_profile(builder, network, config, imgsz)
 
     if not _platform_has_fast(builder, "int8"):
         print("[trt] warning: platform reports no fast INT8; continuing anyway")
