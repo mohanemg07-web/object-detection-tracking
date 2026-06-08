@@ -80,6 +80,64 @@ def bench_pytorch(path: Path, imgsz: int, runs: int, warmup: int) -> BenchResult
     return BenchResult("PyTorch FP32", _file_mb(path), lat, fps)
 
 
+def bench_tensorrt(path: Path, imgsz: int, runs: int, warmup: int) -> BenchResult:
+    """Time inference through a serialized TensorRT engine (TRT 10.x API).
+
+    Uses the modern name-based tensor API (num_io_tensors / get_tensor_name /
+    set_input_shape / set_tensor_address / execute_async_v3) — NOT the removed
+    pre-10 binding API. Requires pycuda + a CUDA device. Raises on failure so
+    the caller can fall back to a "present but not timed" note.
+    """
+    import pycuda.autoinit  # noqa: F401  (initializes the CUDA context)
+    import pycuda.driver as cuda
+    import tensorrt as trt
+
+    logger = trt.Logger(trt.Logger.ERROR)
+    runtime = trt.Runtime(logger)
+    engine = runtime.deserialize_cuda_engine(path.read_bytes())
+    if engine is None:
+        raise RuntimeError("failed to deserialize engine")
+    context = engine.create_execution_context()
+
+    stream = cuda.Stream()
+    rng = np.random.default_rng(0)
+    host_buffers: dict[str, np.ndarray] = {}
+    device_buffers: dict[str, object] = {}
+
+    # Discover I/O tensors by name (TRT 10 API).
+    input_names: list[str] = []
+    for i in range(engine.num_io_tensors):
+        name = engine.get_tensor_name(i)
+        is_input = engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT
+        if is_input:
+            # Pin the (possibly dynamic) input to the benchmark shape.
+            context.set_input_shape(name, (1, 3, imgsz, imgsz))
+            input_names.append(name)
+
+    # Allocate host+device buffers for every I/O tensor at resolved shapes.
+    for i in range(engine.num_io_tensors):
+        name = engine.get_tensor_name(i)
+        shape = tuple(context.get_tensor_shape(name))
+        host = rng.standard_normal(shape).astype(np.float32)
+        host = np.ascontiguousarray(host)
+        dev = cuda.mem_alloc(host.nbytes)
+        host_buffers[name] = host
+        device_buffers[name] = dev
+        context.set_tensor_address(name, int(dev))
+
+    # Upload inputs once (we time pure execution, like the ONNX path).
+    for name in input_names:
+        cuda.memcpy_htod_async(device_buffers[name], host_buffers[name], stream)
+    stream.synchronize()
+
+    def _run():
+        context.execute_async_v3(stream_handle=stream.handle)
+        stream.synchronize()
+
+    lat, fps = _time_callable(_run, runs, warmup)
+    return BenchResult("TensorRT INT8", _file_mb(path), lat, fps)
+
+
 def run_benchmarks(
     weights_dir: Path, imgsz: int, runs: int, warmup: int, stem: str = "best"
 ) -> list[BenchResult]:
@@ -107,8 +165,23 @@ def run_benchmarks(
         results.append(BenchResult("ONNX INT8", None, None, None, f"{onnx_int8.name} not found"))
 
     engine = weights_dir / f"{stem}.int8.engine"
-    note = "GPU only — run on a CUDA machine" if not engine.exists() else "present (bench on GPU)"
-    results.append(BenchResult("TensorRT INT8", _file_mb(engine), None, None, note))
+    if engine.exists():
+        try:
+            results.append(bench_tensorrt(engine, imgsz, runs, warmup))
+        except Exception as exc:  # noqa: BLE001 - keep CPU rows even if TRT fails
+            results.append(
+                BenchResult(
+                    "TensorRT INT8",
+                    _file_mb(engine),
+                    None,
+                    None,
+                    f"present but not timed ({exc})",
+                )
+            )
+    else:
+        results.append(
+            BenchResult("TensorRT INT8", None, None, None, "GPU only — run on a CUDA machine")
+        )
 
     return results
 
