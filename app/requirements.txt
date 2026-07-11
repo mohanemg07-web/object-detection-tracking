@@ -1,7 +1,9 @@
 # CPU-only dependencies for the HuggingFace Spaces demo.
 # Deliberately minimal: NO torch, NO ultralytics, NO tensorrt.
-# Inference runs on the ONNX INT8 model via ONNX Runtime (CPU).
-gradio>=4.19,<5.0
+# Inference runs on the FP32 ONNX model via ONNX Runtime (CPU).
+# gradio pinned to 5.9.1: gradio 4.x hits audioop/HfFolder/gradio_client
+# schema failures on current HF Spaces base images.
+gradio==5.9.1
 onnxruntime>=1.17
 opencv-python-headless>=4.8,<5.0
 numpy>=1.24,<2.0

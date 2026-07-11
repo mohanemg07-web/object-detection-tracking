@@ -12,6 +12,29 @@ On Spaces this file is the entrypoint (see app/README.md header).
 
 from __future__ import annotations
 
+# --- gradio_client schema bool-bug shim (must run before gradio builds api_info) ---
+# gradio_client's _json_schema_to_python_type crashes with
+# "TypeError: argument of type 'bool' is not iterable" when a component schema
+# contains a boolean node (e.g. additionalProperties: true). Present in gradio
+# 4.44 and 5.9; this shim makes the schema walker tolerate booleans.
+import gradio_client.utils as _gcu
+_ORIG_JS2PT = _gcu._json_schema_to_python_type
+def _safe_js2pt(schema, defs=None):
+    if isinstance(schema, bool):
+        return "Any"
+    try:
+        return _ORIG_JS2PT(schema, defs)
+    except Exception:
+        return "Any"
+_gcu._json_schema_to_python_type = _safe_js2pt
+_ORIG_GET_TYPE = _gcu.get_type
+def _safe_get_type(schema):
+    if not isinstance(schema, dict):
+        return "Any"
+    return _ORIG_GET_TYPE(schema)
+_gcu.get_type = _safe_get_type
+# --- end shim ---
+
 import sys
 from pathlib import Path
 
