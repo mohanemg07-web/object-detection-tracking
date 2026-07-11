@@ -15,13 +15,22 @@ license: mit
 
 Gradio demo for **HuggingFace Spaces** (free CPU tier: 2 vCPU / 16 GB).
 
-Runs the fine-tuned **YOLOv8m → ONNX INT8** model via ONNX Runtime
+▶️ **Live:** [huggingface.co/spaces/MohanGen/visdrone-detection-tracking](https://huggingface.co/spaces/MohanGen/visdrone-detection-tracking)
+
+Runs the fine-tuned **YOLOv8m → FP32 ONNX** model via ONNX Runtime
 (`CPUExecutionProvider`) with a dependency-light **ByteTrack** tracker.
 Upload an aerial image for detection, or a short video for multi-object
 tracking with a live FPS readout. Ten VisDrone classes: pedestrian,
 people, bicycle, car, van, truck, tricycle, awning-tricycle, bus, motor.
 
-> The demo never uses TensorRT (GPU-only). It loads the ONNX INT8 model.
+> The demo runs the **FP32 ONNX** model, **not** INT8. The INT8 model passed
+> tensor-level parity (max abs diff 1.1e-3) but produces **zero detections**
+> on real images (all class scores ≈ 0) — real-image validation caught what
+> the near-zero tensor diff missed. The demo also never uses TensorRT
+> (GPU-only).
+
+Measured on the free CPU tier: a single image with **67 objects in 1514 ms**;
+a **192-frame** video tracked at **avg 0.8 FPS** (ONNX Runtime CPU + ByteTrack).
 
 ## Deploying to Spaces
 
@@ -29,7 +38,7 @@ The Space needs these three files at its repo root:
 
 - `app.py`           (this folder's app)
 - `requirements.txt` (this folder's CPU-only deps)
-- `best.int8.onnx`   (the quantized model — add via Git LFS or download at startup)
+- `best.onnx`        (the FP32 ONNX model — add via Git LFS or download at startup; **not** the INT8 model, which produces zero detections)
 
 Because `app.py` imports the `src/` package, deploy with **either**:
 
@@ -40,15 +49,15 @@ Because `app.py` imports the `src/` package, deploy with **either**:
    `preprocessing/`) to the Space root.
 
 Set the model location with the `MODEL_PATH` env var if it isn't at
-`weights/best.int8.onnx`. Other env vars: `IMGSZ`, `CONF`,
-`MAX_VIDEO_FRAMES`.
+`weights/best.onnx`. Other env vars: `IMGSZ`, `CONF`, `MAX_VIDEO_FRAMES`.
 
 ## Run locally
 
 ```bash
 pip install -r app/requirements.txt
-MODEL_PATH=weights/best.int8.onnx python app/app.py
+MODEL_PATH=weights/best.onnx python app/app.py
 ```
 
-Performance target on the free CPU tier: **~3–4 FPS**. Long videos are
-capped (default 300 frames) to stay within memory/time limits.
+Measured on the free CPU tier: single image with 67 objects in **1514 ms**;
+a 192-frame video tracked at **avg 0.8 FPS**. Long videos are capped
+(default 300 frames) to stay within memory/time limits.

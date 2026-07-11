@@ -11,6 +11,23 @@ the [VisDrone](http://aiskyeye.com/) aerial dataset, with full MLOps and a
 
 ---
 
+## Live Demo
+
+▶️ **[huggingface.co/spaces/MohanGen/visdrone-detection-tracking](https://huggingface.co/spaces/MohanGen/visdrone-detection-tracking)**
+
+Measured on the HF Spaces **free tier (2 vCPU, ONNX Runtime CPU, FP32 ONNX +
+ByteTrack)**:
+
+| Mode          | Workload              | Measured |
+|---------------|-----------------------|----------|
+| Single image  | detection             | **67 objects in 1514 ms** |
+| Video         | detection + tracking  | **192 frames at avg 0.8 FPS** |
+
+The demo runs the **FP32 ONNX** model — the INT8 model produces zero
+detections on real images (see the [known issue](#optimization-size--latency--fps)).
+
+---
+
 ## Why this project
 
 A portfolio-grade pipeline that prioritizes **clean code, reproducibility,
@@ -53,7 +70,7 @@ flowchart TB
     B --> C --> D
     E -->|export| F
     E --> I
-    G --> K
+    F --> K
     G --> BM
     H --> BM
 ```
@@ -105,7 +122,12 @@ drag the mean down.
 | PyTorch FP32  |  52.0     |   317.6      |   3.1 | CPU |
 | ONNX FP32     | 103.6     |   262.0      |   3.8 | CPU |
 | ONNX INT8     |  26.5     |   434.7      |   2.3 | CPU |
-| TensorRT INT8 |  30.4     |     4.2      | 240.7 | **T4 GPU** |
+| TensorRT INT8 |  30.4     |     4.2      | 240.7¹ | **T4 GPU** |
+
+¹ **Speed benchmark only.** 240.7 FPS / 4.2 ms is a latency measurement; the
+detection **accuracy** of the INT8 engine was **not** validated on real
+images (see the known issue below). Treat this row as a throughput ceiling,
+not a validated deployment result.
 
 **Honest framing:** the PyTorch/ONNX rows are **CPU-measured**; the TensorRT
 row is **T4 GPU-measured** — different hardware, so don't read the table as a
@@ -117,7 +139,17 @@ single apples-to-apples latency ladder. Two takeaways that *are* fair:
   the CPU INT8 win here is purely **size**, not speed.
 - **TensorRT INT8 on the T4 is the real speed story: 240.7 FPS / 4.2 ms** —
   that's the GPU deployment path, where INT8 delivers both small size *and*
-  large speedup.
+  large speedup (speed only — accuracy unvalidated, see below).
+
+> ⚠️ **Known issue — dynamic INT8 quantization produces zero detections.**
+> The ONNX↔ONNX parity check passed at the tensor level (max abs diff
+> **1.1e-3**), yet the dynamically-quantized INT8 model produced **zero
+> detections** on real VisDrone images — all class scores collapsed to ≈ 0.
+> **Root cause:** tensor-level diff checks on near-zero outputs pass
+> trivially (0 ≈ 0), so the parity gate never caught the regression;
+> **real-image validation did.** The 74.4% size reduction is real, but the
+> quantized model is not usable for detection as-is. **For this reason the
+> live demo runs the FP32 ONNX model**, not the INT8 model.
 
 ### Tracking (VisDrone-MOT)
 
@@ -128,9 +160,11 @@ VisDrone-MOT sequence to populate this section.
 
 ### Demo (HuggingFace Spaces, CPU 2 vCPU / 16 GB)
 
-The Gradio app runs the ONNX INT8 model on CPU via ONNX Runtime. Expected
-throughput on the free tier is a few FPS (consistent with the CPU ONNX
-latency above); the app prints the live FPS it actually achieves.
+The Gradio app runs the **FP32 ONNX** model on CPU via ONNX Runtime — **not**
+the INT8 model, which produces zero detections (see the known issue under
+[Optimization](#optimization-size--latency--fps)). Throughput on the free
+tier is a few FPS (consistent with the CPU ONNX FP32 latency above); the app
+prints the live FPS it actually achieves.
 
 ---
 
