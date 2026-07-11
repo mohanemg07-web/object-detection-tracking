@@ -31,9 +31,11 @@ detections on real images (see the [known issue](#optimization-size--latency--fp
 ## Why this project
 
 A portfolio-grade pipeline that prioritizes **clean code, reproducibility,
-honest metrics, and free-tier deployability**. Every GPU-only step (training,
-TensorRT) is isolated into standalone scripts + notebooks so it runs on a
-free Colab T4; the deployed demo runs entirely on CPU via ONNX Runtime.
+honest metrics, and free-tier deployability**. Every GPU-only step is isolated
+into standalone scripts + notebooks: training ran on a Colab **A100-80GB**,
+while the optimization notebook (ONNX export/quantize + TensorRT benchmark)
+ran on a **free Colab T4**. The deployed demo runs entirely on CPU via ONNX
+Runtime.
 
 ## Architecture
 
@@ -48,7 +50,7 @@ flowchart TB
         C[OpenCV<br/>CLAHE · perspective]
     end
 
-    subgraph train["3 · Train (GPU · Colab T4)"]
+    subgraph train["3 · Train (GPU · Colab A100)"]
         D[YOLOv8m fine-tune] --> E[best.pt]
         D -. params/metrics/artifacts .-> ML[(MLflow<br/>DagsHub)]
     end
@@ -220,10 +222,12 @@ python -m src.preprocessing.cli --image path/to/aerial.jpg \
     --config configs/preprocess.yaml --out outputs/preprocess_demo.jpg
 ```
 
-### 3 · Train (GPU · Colab T4)
+### 3 · Train (GPU · Colab)
 
 1. Open [`notebooks/train_colab.ipynb`](notebooks/train_colab.ipynb) in Colab.
-2. *Runtime → Change runtime type → T4 GPU*.
+2. *Runtime → Change runtime type → GPU*. Any Colab GPU works — the free-tier
+   T4 is fine but slow; the reported results came from an A100-80GB run
+   (50 epochs in ~47 min).
 3. Add a Colab secret `DAGSHUB_TOKEN`; set your DagsHub MLflow URI + username
    in the Config cell.
 4. *Run all* (~3 h for 100 epochs). `best.pt` is saved to Drive.
@@ -322,8 +326,9 @@ ruff check . && black --check . && pytest -q
 
 - **GPU required** for training and TensorRT INT8. Both call
   `torch.cuda.is_available()` and fail fast with a clear message on CPU
-  (training allows `--allow-cpu --epochs 1` for a smoke test only). Use the
-  free Colab T4 notebooks for the real runs.
+  (training allows `--allow-cpu --epochs 1` for a smoke test only). The
+  reported training run used a Colab **A100-80GB**; the optimization notebook
+  (ONNX export/quantize + TensorRT benchmark) used a **free Colab T4**.
 - The **deployed demo is CPU-only** (ONNX Runtime, `CPUExecutionProvider`,
   no torch/TensorRT). It runs at a few FPS on the free tier — far below the
   measured **TensorRT INT8 GPU throughput (240.7 FPS / 4.2 ms on a T4)** —
